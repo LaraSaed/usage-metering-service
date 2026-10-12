@@ -1,4 +1,8 @@
-import { Pool } from "pg";
+import { Pool, types } from "pg";
+
+// Return bigint columns (type id 20) as JS numbers instead of strings.
+// Safe here: unit counts stay far below Number.MAX_SAFE_INTEGER.
+types.setTypeParser(20, (value) => parseInt(value, 10));
 
 export const pool = new Pool({
   connectionString:
