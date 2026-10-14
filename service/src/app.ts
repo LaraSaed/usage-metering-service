@@ -1,5 +1,7 @@
 import express from "express";
+import type { NextFunction, Request, Response } from "express";
 import { pool } from "./db";
+import { accountsRouter } from "./routes/accounts";
 
 // Builds the app without starting it, so tests can use it too.
 export function buildApp() {
@@ -14,6 +16,22 @@ export function buildApp() {
     } catch {
       res.status(503).json({ status: "error", database: "down" });
     }
+  });
+
+  app.use(accountsRouter);
+
+  // Unknown route
+  app.use((_req, res) => {
+    res.status(404).json({ error: "not_found", message: "No such endpoint." });
+  });
+
+  // Any unexpected error (bad JSON, database error, bug) ends up here.
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    if (err.type === "entity.parse.failed") {
+      return res.status(400).json({ error: "invalid_json", message: "Request body is not valid JSON." });
+    }
+    console.error(err);
+    res.status(500).json({ error: "internal_error", message: "Something went wrong." });
   });
 
   return app;

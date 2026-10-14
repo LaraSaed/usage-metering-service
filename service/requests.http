@@ -1,0 +1,25 @@
+### 1. Create an account
+POST http://localhost:3000/accounts
+Content-Type: application/json
+
+{ "name": "DocProcessor", "plan": "Starter" }
+
+### Paste the api_key from the response of request 1 here
+@key = mk_lELUc4xfsfRvE9hmUqAcP9l-35OAvXmQ
+
+### 2. Who am I?
+GET http://localhost:3000/me
+x-api-key: {{key}}
+
+### 3. No key
+GET http://localhost:3000/me
+
+### 4. Wrong key
+GET http://localhost:3000/me
+x-api-key: mk_wrong
+
+### 5. Unknown plan
+POST http://localhost:3000/accounts
+Content-Type: application/json
+
+{ "name": "Test", "plan": "Basic" }
