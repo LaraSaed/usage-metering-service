@@ -4,6 +4,7 @@ import { pool } from "./db";
 import { accountsRouter } from "./routes/accounts";
 import { usersRouter } from "./routes/users";
 import { plansRouter } from "./routes/plans";
+import { consumeRouter } from "./routes/consume";
 
 // Builds the app without starting it, so tests can use it too.
 export function buildApp() {
@@ -23,6 +24,7 @@ export function buildApp() {
   app.use(accountsRouter);
   app.use(usersRouter);
   app.use(plansRouter);
+  app.use(consumeRouter);
 
   // Unknown route
   app.use((_req, res) => {

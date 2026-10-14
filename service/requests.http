@@ -153,3 +153,76 @@ Content-Type: application/json
 x-api-key: {{key}}
 
 { "plan": "Basic" }
+
+############ CONSUME ############
+
+### 26. Accepted: alice asks for 10 (her plan allows 20 per request)
+POST http://localhost:3000/consume
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "user_id": "alice", "units": 10, "request_id": "demo-1" }
+
+### 27. Retry the same request_id → same answer, "replayed": true, not counted again
+POST http://localhost:3000/consume
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "user_id": "alice", "units": 10, "request_id": "demo-1" }
+
+### 28. Same request_id, different units → 409
+POST http://localhost:3000/consume
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "user_id": "alice", "units": 11, "request_id": "demo-1" }
+
+### 29. Rejected by user's per-request limit: create a user on Basic (max 20), ask for 25
+POST http://localhost:3000/users
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "external_id": "eve", "plan": "Basic" }
+
+###
+POST http://localhost:3000/consume
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "user_id": "eve", "units": 25, "request_id": "demo-2" }
+
+### 30. Rejected by the account's monthly limit:
+### create a tiny account plan, switch to it, then ask for more than is left
+POST http://localhost:3000/plans
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "name": "Tiny", "scope": "account", "monthly_allowance": 5, "max_units_per_request": 100 }
+
+###
+PUT http://localhost:3000/me/plan
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "plan": "Tiny" }
+
+###
+POST http://localhost:3000/consume
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "user_id": "eve", "units": 10, "request_id": "demo-3" }
+
+### 31. Switch the account back to Pro so later tests work
+PUT http://localhost:3000/me/plan
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "plan": "Pro" }
+
+### 32. Unknown user → 404
+POST http://localhost:3000/consume
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "user_id": "zack", "units": 1, "request_id": "demo-4" }
