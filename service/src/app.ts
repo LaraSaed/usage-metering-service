@@ -5,6 +5,7 @@ import { accountsRouter } from "./routes/accounts";
 import { usersRouter } from "./routes/users";
 import { plansRouter } from "./routes/plans";
 import { consumeRouter } from "./routes/consume";
+import { usageRouter } from "./routes/usage";
 
 // Builds the app without starting it, so tests can use it too.
 export function buildApp() {
@@ -25,7 +26,7 @@ export function buildApp() {
   app.use(usersRouter);
   app.use(plansRouter);
   app.use(consumeRouter);
-
+  app.use(usageRouter);
   // Unknown route
   app.use((_req, res) => {
     res.status(404).json({ error: "not_found", message: "No such endpoint." });

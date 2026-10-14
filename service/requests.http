@@ -226,3 +226,33 @@ Content-Type: application/json
 x-api-key: {{key}}
 
 { "user_id": "zack", "units": 1, "request_id": "demo-4" }
+
+############ USAGE & HISTORY ############
+
+### 33. Usage this month: account + all users
+GET http://localhost:3000/usage
+x-api-key: {{key}}
+
+### 34. Usage for a past month (only "used")
+GET http://localhost:3000/usage?month=2026-09
+x-api-key: {{key}}
+
+### 35. One user's usage this month
+GET http://localhost:3000/users/alice/usage
+x-api-key: {{key}}
+
+### 36. Account request history, 3 per page (copy next_cursor for the next page)
+GET http://localhost:3000/requests?limit=3
+x-api-key: {{key}}
+
+### 37. Next page (paste the next_cursor from 36)
+GET http://localhost:3000/requests?limit=3&cursor=PASTE_NEXT_CURSOR
+x-api-key: {{key}}
+
+### 38. One user's request history
+GET http://localhost:3000/users/eve/requests
+x-api-key: {{key}}
+
+### 39. Invalid month → 400
+GET http://localhost:3000/usage?month=2026-13
+x-api-key: {{key}}
