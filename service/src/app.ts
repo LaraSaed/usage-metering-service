@@ -2,6 +2,7 @@ import express from "express";
 import type { NextFunction, Request, Response } from "express";
 import { pool } from "./db";
 import { accountsRouter } from "./routes/accounts";
+import { usersRouter } from "./routes/users";
 
 // Builds the app without starting it, so tests can use it too.
 export function buildApp() {
@@ -19,6 +20,7 @@ export function buildApp() {
   });
 
   app.use(accountsRouter);
+  app.use(usersRouter);
 
   // Unknown route
   app.use((_req, res) => {

@@ -23,3 +23,47 @@ POST http://localhost:3000/accounts
 Content-Type: application/json
 
 { "name": "Test", "plan": "Basic" }
+
+
+### 6. Create user alice (default plan Basic)
+POST http://localhost:3000/users
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "external_id": "alice" }
+
+### 7. Create user bob on Premium
+POST http://localhost:3000/users
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "external_id": "bob", "plan": "Premium" }
+
+### 8. Create alice again → 409
+POST http://localhost:3000/users
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "external_id": "alice" }
+
+### 9. Give a user an account plan → 400
+POST http://localhost:3000/users
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "external_id": "carol", "plan": "Starter" }
+
+### 10. Get alice
+GET http://localhost:3000/users/alice
+x-api-key: {{key}}
+
+### 11. Switch alice to Premium
+PUT http://localhost:3000/users/alice/plan
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "plan": "Premium" }
+
+### 12. Unknown user → 404
+GET http://localhost:3000/users/zack
+x-api-key: {{key}}
