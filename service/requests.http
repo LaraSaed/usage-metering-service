@@ -1,3 +1,5 @@
+   ############ ACCOUNTS ############
+
 ### 1. Create an account
 POST http://localhost:3000/accounts
 Content-Type: application/json
@@ -24,6 +26,7 @@ Content-Type: application/json
 
 { "name": "Test", "plan": "Basic" }
 
+   ############ USERS ############
 
 ### 6. Create user alice (default plan Basic)
 POST http://localhost:3000/users
@@ -67,3 +70,86 @@ x-api-key: {{key}}
 ### 12. Unknown user → 404
 GET http://localhost:3000/users/zack
 x-api-key: {{key}}
+
+
+   ############ PLANS ############
+
+### 13. List all plans
+GET http://localhost:3000/plans
+x-api-key: {{key}}
+
+### 14. List only user plans
+GET http://localhost:3000/plans?scope=user
+x-api-key: {{key}}
+
+### 15. Create custom user plan Gold (copy its "id" from the response)
+POST http://localhost:3000/plans
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "name": "Gold", "scope": "user", "monthly_allowance": 2000, "max_units_per_request": 50 }
+
+### Paste Gold's id here
+@goldId = 44b98aaa-f45b-409f-b9f0-c5adfcaeb2bb
+
+### 16. Get Gold
+GET http://localhost:3000/plans/{{goldId}}
+x-api-key: {{key}}
+
+### 17. Edit Gold's allowance
+PATCH http://localhost:3000/plans/{{goldId}}
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "monthly_allowance": 3000 }
+
+### 18. Put a user on Gold
+POST http://localhost:3000/users
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "external_id": "dana", "plan": "Gold" }
+
+### 19. Invalid numbers → 400
+POST http://localhost:3000/plans
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "name": "Bad", "scope": "user", "monthly_allowance": 1.5, "max_units_per_request": 0 }
+
+### 20. Switch the account to Pro
+PUT http://localhost:3000/me/plan
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "plan": "Pro" }
+
+
+### 21. List only account plans
+GET http://localhost:3000/plans?scope=account
+x-api-key: {{key}}
+
+### 22. Create a custom account plan
+POST http://localhost:3000/plans
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "name": "Enterprise", "scope": "account", "monthly_allowance": 500000, "max_units_per_request": 5000 }
+
+### 23. Switch the account to the custom plan
+PUT http://localhost:3000/me/plan
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "plan": "Enterprise" }
+
+### 24. Check the account's plan
+GET http://localhost:3000/me
+x-api-key: {{key}}
+
+### 25. Give the account a user plan → 400
+PUT http://localhost:3000/me/plan
+Content-Type: application/json
+x-api-key: {{key}}
+
+{ "plan": "Basic" }
