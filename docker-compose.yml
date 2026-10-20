@@ -1,3 +1,5 @@
+# Starts the whole stack: database, metering service, and example client.
+# Usage: docker compose up --build
 services:
   db:
     image: postgres:16
@@ -9,12 +11,35 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Runs the migration (tables and predefined plans) on the first start of a new volume.
       - ./service/migrations:/docker-entrypoint-initdb.d:ro
-
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U metering"]
       interval: 3s
       retries: 10
+
+  service:
+    build: ./service
+    environment:
+      DATABASE_URL: postgres://metering:metering@db:5432/metering
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 3s
+      retries: 20
+
+  client:
+    build: ./client
+    environment:
+      METERING_URL: http://service:3000
+    depends_on:
+      service:
+        condition: service_healthy
 
 volumes:
   pgdata:
