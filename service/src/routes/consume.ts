@@ -120,37 +120,30 @@ consumeRouter.post("/consume", requireApiKey, async (req, res) => {
   }
 
   // 4. Decide inside one transaction, holding row locks so concurrent requests can't overspend.
+  //    Kept to a few round trips: the counter rows stay locked for as short a time as possible.
+  const month = new Date().toISOString().slice(0, 7); // current UTC month, e.g. "2026-10"
+  const periodStart = `${month}-01`;
+
   const client = await pool.connect();
+  let response;
   try {
     await client.query("BEGIN");
 
-    // Current UTC month, e.g. 2026-10-01.
-    const periodResult = await client.query(
-      "SELECT date_trunc('month', now() AT TIME ZONE 'UTC')::date::text AS period_start",
-    );
-    const periodStart: string = periodResult.rows[0].period_start;
-
-    // Make sure this month's counter rows exist (a new month starts at 0).
-    await client.query(
-      `INSERT INTO account_usage (account_id, period_start) VALUES ($1, $2)
-       ON CONFLICT DO NOTHING`,
-      [accountId, periodStart],
-    );
-    await client.query(
-      `INSERT INTO user_usage (user_id, account_id, period_start) VALUES ($1, $2, $3)
-       ON CONFLICT DO NOTHING`,
-      [user.id, accountId, periodStart],
-    );
-
-    // 5. Lock the counters: always account first, then user (same order everywhere = no deadlocks).
+    // 5. Create this month's counter row if needed AND lock it, in one query.
+    //    "ON CONFLICT ... DO UPDATE" takes a row lock even when the row already exists.
+    //    Always account first, then user (same order everywhere = no deadlocks).
     //    Other requests for this account wait here until we commit.
     const accountUsage = await client.query(
-      "SELECT units_used FROM account_usage WHERE account_id = $1 AND period_start = $2 FOR UPDATE",
+      `INSERT INTO account_usage (account_id, period_start) VALUES ($1, $2)
+       ON CONFLICT (account_id, period_start) DO UPDATE SET units_used = account_usage.units_used
+       RETURNING units_used`,
       [accountId, periodStart],
     );
     const userUsage = await client.query(
-      "SELECT units_used FROM user_usage WHERE user_id = $1 AND period_start = $2 FOR UPDATE",
-      [user.id, periodStart],
+      `INSERT INTO user_usage (user_id, account_id, period_start) VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, period_start) DO UPDATE SET units_used = user_usage.units_used
+       RETURNING units_used`,
+      [user.id, accountId, periodStart],
     );
     const accountUsed: number = accountUsage.rows[0].units_used;
     const userUsed: number = userUsage.rows[0].units_used;
@@ -173,40 +166,49 @@ consumeRouter.post("/consume", requireApiKey, async (req, res) => {
     // 7. Decide.
     const rejection = checkRules(units, userPlan, userUsed, accountPlan, accountUsed);
     const accepted = rejection === null;
+    const added = accepted ? units : 0;
+    const accountRemaining = remaining(accountPlan.monthly_allowance, accountUsed + added);
+    const userRemaining = remaining(userPlan.monthly_allowance, userUsed + added);
 
-    // 8. If accepted, count the units at both levels.
-    let newAccountUsed = accountUsed;
-    let newUserUsed = userUsed;
-    if (accepted) {
-      await client.query(
-        "UPDATE account_usage SET units_used = units_used + $3 WHERE account_id = $1 AND period_start = $2",
-        [accountId, periodStart, units],
-      );
-      await client.query(
-        "UPDATE user_usage SET units_used = units_used + $3 WHERE user_id = $1 AND period_start = $2",
-        [user.id, periodStart, units],
-      );
-      newAccountUsed += units;
-      newUserUsed += units;
-    }
-
-    // 9. Record the decision (accepted or rejected) with a snapshot of the plans and remaining units.
-    await client.query(
-      `INSERT INTO usage_requests
+    // 8 + 9. In ONE statement: add the units to both counters (only if accepted)
+    //        and record the decision with a snapshot of the plans and remaining units.
+    const saved = await client.query(
+      `WITH add_account AS (
+         UPDATE account_usage SET units_used = units_used + $4
+          WHERE $14::boolean AND account_id = $1 AND period_start = $9
+       ), add_user AS (
+         UPDATE user_usage SET units_used = units_used + $4
+          WHERE $14::boolean AND user_id = $2 AND period_start = $9
+       )
+       INSERT INTO usage_requests
          (account_id, user_id, request_id, units, status,
           rejected_by_level, rejected_by_rule, rule_limit,
           period_start, account_plan_id, user_plan_id, account_remaining, user_remaining)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       RETURNING created_at`,
       [
         accountId, user.id, request_id, units, accepted ? "accepted" : "rejected",
         rejection?.level ?? null, rejection?.rule ?? null, rejection?.limit ?? null,
-        periodStart, accountPlan.id, userPlan.id,
-        remaining(accountPlan.monthly_allowance, newAccountUsed),
-        remaining(userPlan.monthly_allowance, newUserUsed),
+        periodStart, accountPlan.id, userPlan.id, accountRemaining, userRemaining,
+        accepted,
       ],
     );
 
     await client.query("COMMIT");
+
+    // 10. Build the reply from what we already know (no extra query).
+    response = {
+      request_id,
+      user_id,
+      status: accepted ? "accepted" : "rejected",
+      units,
+      period: month,
+      rejected_by: rejection,
+      user: { plan: { id: userPlan.id, name: userPlan.name }, remaining: userRemaining },
+      account: { plan: { id: accountPlan.id, name: accountPlan.name }, remaining: accountRemaining },
+      created_at: saved.rows[0].created_at,
+      replayed: false,
+    };
   } catch (err: any) {
     await client.query("ROLLBACK");
     // Two requests with the same request_id arrived at the same time: the other one won.
@@ -227,7 +229,5 @@ consumeRouter.post("/consume", requireApiKey, async (req, res) => {
     client.release();
   }
 
-  // 10. Reply with the saved decision.
-  const decision = await loadSavedDecision(pool, accountId, request_id);
-  res.json({ ...decision, replayed: false });
+  res.json(response);
 });

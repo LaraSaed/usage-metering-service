@@ -8,4 +8,6 @@ export const pool = new Pool({
   connectionString:
     process.env.DATABASE_URL ??
     "postgres://metering:metering@localhost:5433/metering",
+  // Max open connections. Configurable so it can be tuned with the load test.
+  max: Number(process.env.PG_POOL_MAX ?? 10),
 });
