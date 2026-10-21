@@ -511,7 +511,6 @@ In Docker Compose, the service and client receive their settings from `docker-co
 - **No rate limiting.**
 - **API key lookup on every request.** An in-memory cache would remove one query per request, at the cost of slightly stale data.
 - **Predefined plans are created only on a new database.** An existing volume keeps its plans. Use `docker compose down -v` for a fresh start.
-- **Numbers are stored as JavaScript numbers.** Values above 2^53 (about 9 quadrillion) would lose precision. The brief's limits are far below this.
 - **Accounts, users, and plans cannot be deleted.**
 - **The load test creates data.** It adds `load-*` accounts to the development database. Use `docker compose down -v` to clean up.
 - **Results are from one machine.** They show relative change, not production capacity.
